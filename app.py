@@ -7,9 +7,6 @@ from PIL import Image
 
 app = Flask(__name__)
 
-# ---------------------------------------------------------
-# 1. DATABASE SETUP (The Vault)
-# ---------------------------------------------------------
 def init_db():
     """Creates a local SQLite database and table if it doesn't exist."""
     conn = sqlite3.connect('contracts.db')
@@ -41,7 +38,6 @@ def analyze_contract():
     file = request.files['document']
     image = Image.open(file.stream)
     
-    # B. The Engineered Prompt (Forces Strict JSON Output)
     prompt = """
     You are an expert legal assistant specializing in real estate and tenancy agreements.
     Analyze the provided image/document of the lease agreement.
@@ -58,7 +54,6 @@ def analyze_contract():
     """
 
     try:
-        # C. Send Image + Prompt to Gemini (WITH AUTOMATIC RETRIES)
         max_retries = 3
         raw_text = ""
         
@@ -69,19 +64,17 @@ def analyze_contract():
                     contents=[image, prompt]
                 )
                 raw_text = response.text.strip()
-                break  # If successful, break out of the retry loop!
+                break 
                 
             except Exception as api_error:
                 if "503" in str(api_error) or "UNAVAILABLE" in str(api_error):
                     if attempt < max_retries - 1:
-                        wait_time = 2 ** attempt  # Waits 1s, then 2s
+                        wait_time = 2 ** attempt 
                         print(f"Google servers busy. Retrying in {wait_time} seconds...")
                         time.sleep(wait_time)
-                        continue # Try again
-                # If it's a different error, or we ran out of retries, crash normally
+                        continue 
                 raise api_error
         
-        # D. Parse the AI's text response back into a Python Dictionary
         if raw_text.startswith("```json"):
             raw_text = raw_text[7:]
         if raw_text.endswith("```"):
@@ -90,7 +83,6 @@ def analyze_contract():
         summary_data = json.loads(raw_text)
 
         
-        # E. Save the structured data to the SQLite Database
         conn = sqlite3.connect('contracts.db')
         c = conn.cursor()
         c.execute('''
@@ -108,7 +100,6 @@ def analyze_contract():
         conn.commit()
         conn.close()
         
-        # F. Return the success message and data back to Streamlit
         return jsonify({
             "message": "Analysis successful",
             "db_id": db_id,
@@ -120,5 +111,4 @@ def analyze_contract():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    # Starts the Flask server on port 5000
     app.run(debug=True, port=5000)
